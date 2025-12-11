@@ -1,0 +1,133 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+  engyneType   = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SlotVolatility {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+  EXTREME
+  INSANE
+}
+
+enum HuntStatus {
+  DRAFT
+  ACTIVE
+  FINISHED
+}
+
+model User {
+  id                String    @id @default(uuid())
+  userName          String    @unique @map("user_name")
+  email             String    @unique
+  avatar            String?
+  passwordHash      String    @map("password_hash")
+  refreshTokenHash  String?   @map("refresh_token_hash")
+  resetToken        String?   @map("reset_token")
+  resetTokenExpires DateTime? @map("reset_token_expires")
+  lastLogin         DateTime? @map("last_login")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  hunts         Hunt[]
+  favoriteSlots UserFavoriteSlot[]
+
+  @@map("users")
+}
+
+model Currency {
+  code   String @id @db.VarChar(3)
+  name   String
+  symbol String
+
+  hunts Hunt[]
+
+  @@map("currencies")
+}
+
+model Provider {
+  id        String   @id @default(uuid())
+  name      String
+  active    Boolean
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  slots Slot[]
+
+  @@map("providers")
+}
+
+model Slot {
+  id            String         @id @default(uuid())
+  providerId    String         @map("provider_id")
+  name          String
+  active        Boolean        @default(true)
+  rtp           Decimal?       @db.Decimal(5, 2)
+  volatility    SlotVolatility
+  maxMultiplier Int            @map("max_multiplier")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  providers     Provider           @relation(fields: [providerId], references: [id])
+  huntSlots     HuntSlot[]
+  favoriteSlots UserFavoriteSlot[]
+
+  @@map("slots")
+}
+
+model Hunt {
+  id           String     @id @default(uuid())
+  userId       String     @map("user_id")
+  currencyCode String     @map("currency_code") @db.VarChar(3)
+  startBalance Decimal    @map("start_balance") @db.Decimal(10, 2)
+  status       HuntStatus
+  totalSlots   Int        @map("total_slots")
+  totalBet     Decimal    @map("total_bet") @db.Decimal(10, 2)
+  totalWin     Decimal    @map("total_win") @db.Decimal(10, 2)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  savedAt      DateTime?  @map("saved_at")
+  finishedAt   DateTime?  @map("finished_at")
+
+  users     User       @relation(fields: [userId], references: [id])
+  Currency  Currency   @relation(fields: [currencyCode], references: [code])
+  huntSlots HuntSlot[]
+
+  @@map("hunts")
+}
+
+model HuntSlot {
+  id        String   @id @default(uuid())
+  huntId    String   @map("hunt_id")
+  slotId    String   @map("slot_id")
+  betAmount Decimal  @map("bet_amount") @db.Decimal(10, 2)
+  winAmount Decimal  @map("win_amount") @db.Decimal(10, 2)
+  isOpened  Boolean  @default(false) @map("is_opened")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  slots Slot @relation(fields: [slotId], references: [id])
+  hunts Hunt @relation(fields: [huntId], references: [id])
+
+  @@map("hunt_slots")
+}
+
+model UserFavoriteSlot {
+  userId    String   @map("user_id")
+  slotId    String   @map("slot_id")
+  createdAt DateTime @default(now())
+
+  users User @relation(fields: [userId], references: [id])
+  slots Slot @relation(fields: [slotId], references: [id])
+
+  @@id([userId, slotId])
+  @@map("user_favorite_slots")
+}
