@@ -9,7 +9,8 @@ import * as Joi from 'joi';
       validationSchema: Joi.object({
         DATABASE_URL: Joi.string().required(),
         APP_URL: Joi.string().uri().required(),
-        JWT_SECRET: Joi.string().required(),
+        JWT_ACCESS_SECRET: Joi.string().required(),
+        JWT_REFRESH_SECRET: Joi.string().required(),
         JWT_ACCESS_EXPIRATION: Joi.string().default('15m'),
         JWT_REFRESH_EXPIRATION: Joi.string().default('7d'),
         PORT: Joi.number().default(3000),
@@ -18,4 +19,4 @@ import * as Joi from 'joi';
     }),
   ],
 })
-export class ConfigModule {}
+export class ConfigModule { }

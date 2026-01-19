@@ -13,7 +13,7 @@ export type SafeProvider = {
 
 @Injectable()
 export class ProvidersRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async createProvider(data: {
     name: string;
@@ -71,7 +71,7 @@ export class ProvidersRepository {
 
   async updateProvider(
     id: string,
-    data: { name: string },
+    data: { name?: string },
   ): Promise<SafeProvider> {
     return this.prisma.provider.update({
       where: { id },

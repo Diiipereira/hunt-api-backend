@@ -5,24 +5,29 @@ import { JwtAuthGuard } from './core/auth/guards/jwt-auth.guard';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  app.use(helmet());
 
   const publicPath = join(process.cwd(), 'public', 'assets');
   app.useStaticAssets(publicPath, {
     prefix: '/assets/',
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('Bonus Hunt API')
-    .setDescription('API para gerenciamento de caçadas de bônus')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Bonus Hunt API')
+      .setDescription('API para gerenciamento de caçadas de bônus')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',

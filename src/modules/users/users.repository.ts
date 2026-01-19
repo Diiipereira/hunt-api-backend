@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/core/database/prisma.service';
+import { UserRole } from 'generated/prisma/client';
 
 export interface UpdateUserParams {
   resetToken?: string | null;
@@ -17,11 +18,12 @@ export type SafeUser = {
   createdAt: Date;
   avatar?: string | null;
   lastLogin?: Date | null;
+  role?: UserRole;
 };
 
 @Injectable()
 export class UsersRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
@@ -34,6 +36,7 @@ export class UsersRepository {
         avatar: true,
         createdAt: true,
         lastLogin: true,
+        role: true,
       },
     });
   }
@@ -55,6 +58,7 @@ export class UsersRepository {
         avatar: true,
         lastLogin: true,
         createdAt: true,
+        role: true,
       },
     });
   }
@@ -71,6 +75,7 @@ export class UsersRepository {
         userName: true,
         email: true,
         createdAt: true,
+        role: true,
       },
     });
   }
@@ -134,6 +139,7 @@ export class UsersRepository {
         id: true,
         email: true,
         refreshTokenHash: true,
+        role: true,
       },
     });
   }

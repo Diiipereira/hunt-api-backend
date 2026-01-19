@@ -12,7 +12,7 @@ import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
+  constructor(private readonly usersRepository: UsersRepository) { }
 
   private buildSafeUser(user: any, extra?: Record<string, any>) {
     return {
@@ -22,6 +22,7 @@ export class UsersService {
       avatar: user.avatar ?? null,
       lastLogin: user.lastLogin ?? null,
       createdAt: user.createdAt,
+      role: user.role,
       ...extra,
     };
   }

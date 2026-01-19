@@ -14,7 +14,7 @@ export class SlotsService {
   constructor(
     private readonly slotsRepository: SlotsRepository,
     private readonly providersRepository: ProvidersRepository,
-  ) {}
+  ) { }
 
   async createSlot(createSlotDto: CreateSlotDto) {
     const slotExists = await this.slotsRepository.findByName(
@@ -108,5 +108,16 @@ export class SlotsService {
     await this.slotsRepository.updateManyStatusByProvider(providerId, true);
 
     return { message: 'All slots for this provider have been activated' };
+  }
+  async toggleFavorite(userId: string, slotId: string) {
+    const slot = await this.slotsRepository.findById(slotId);
+    if (!slot) {
+      throw new NotFoundException('Slot not found');
+    }
+    return this.slotsRepository.toggleFavorite(userId, slotId);
+  }
+
+  async findAllFavorites(userId: string) {
+    return this.slotsRepository.findFavorites(userId);
   }
 }

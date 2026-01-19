@@ -14,7 +14,7 @@ export type SafeSlot = {
 
 @Injectable()
 export class SlotsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async createSlot(data: {
     providerId: string;
@@ -146,5 +146,57 @@ export class SlotsRepository {
       where: { providerId },
       data: { active: status },
     });
+  }
+  async toggleFavorite(userId: string, slotId: string) {
+    const existing = await this.prisma.userFavoriteSlot.findUnique({
+      where: {
+        userId_slotId: {
+          userId,
+          slotId,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prisma.userFavoriteSlot.delete({
+        where: {
+          userId_slotId: {
+            userId,
+            slotId,
+          },
+        },
+      });
+      return { message: 'Removed from favorites', isFavorite: false };
+    } else {
+      await this.prisma.userFavoriteSlot.create({
+        data: {
+          userId,
+          slotId,
+        },
+      });
+      return { message: 'Added to favorites', isFavorite: true };
+    }
+  }
+
+  async findFavorites(userId: string) {
+    const favorites = await this.prisma.userFavoriteSlot.findMany({
+      where: { userId },
+      include: {
+        slots: {
+          include: {
+            providers: {
+              select: { name: true },
+            },
+          },
+        },
+      },
+    });
+
+    return favorites.map((fav) => ({
+      ...fav.slots,
+      providerName: fav.slots.providers.name,
+      rtp: fav.slots.rtp ? fav.slots.rtp.toString() : null,
+      favoritedAt: fav.createdAt,
+    }));
   }
 }

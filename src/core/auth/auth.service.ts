@@ -26,11 +26,11 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-  ) {}
+  ) { }
 
   async signup(signupDto: SignupDto): Promise<Tokens> {
     const user = await this.usersService.signup(signupDto);
-    const tokens = await this.getTokens(user.id, user.email);
+    const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRtHash(user.id, tokens.refreshToken);
     return tokens;
   }
@@ -50,7 +50,7 @@ export class AuthService {
 
     await this.usersService.updateLastLogin(user.id);
 
-    const tokens = await this.getTokens(user.id, user.email);
+    const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRtHash(user.id, tokens.refreshToken);
 
     return tokens;
@@ -97,7 +97,7 @@ export class AuthService {
     const rtMatches = await bcrypt.compare(rt, user.refreshTokenHash);
     if (!rtMatches) throw new ForbiddenException('Access Denied - Invalid RT');
 
-    const tokens = await this.getTokens(user.id, user.email);
+    const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRtHash(user.id, tokens.refreshToken);
 
     return tokens;
@@ -132,15 +132,18 @@ export class AuthService {
     await this.usersService.updateRefreshToken(userId, hash);
   }
 
-  private async getTokens(userId: string, email: string): Promise<Tokens> {
+  private async getTokens(userId: string, email: string, role: string): Promise<Tokens> {
     interface JwtPayload {
       sub: string;
       email: string;
+      role: string;
     }
 
-    const payload: JwtPayload = { sub: userId, email };
+    const payload: JwtPayload = { sub: userId, email, role };
 
-    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
+    const secret = this.configService.getOrThrow<string>('JWT_ACCESS_SECRET');
+    const refreshSecret = this.configService.getOrThrow<string>('JWT_REFRESH_SECRET');
+
     const atExpiration = this.configService.getOrThrow<string>(
       'JWT_ACCESS_EXPIRATION',
     );
@@ -154,7 +157,7 @@ export class AuthService {
         expiresIn: atExpiration as any,
       }),
       this.jwtService.signAsync(payload, {
-        secret,
+        secret: refreshSecret,
         expiresIn: rtExpiration as any,
       }),
     ]);

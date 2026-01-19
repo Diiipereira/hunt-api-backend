@@ -9,7 +9,7 @@ import { UpdateProviderDto } from './dto/update-provider.dto';
 
 @Injectable()
 export class ProvidersService {
-  constructor(private readonly providersRepository: ProvidersRepository) {}
+  constructor(private readonly providersRepository: ProvidersRepository) { }
 
   async createProvider(createProviderDto: CreateProviderDto) {
     const providerExists = await this.providersRepository.findByName(
@@ -49,10 +49,14 @@ export class ProvidersService {
       throw new NotFoundException('Provider not found');
     }
 
-    const providerExists = await this.providersRepository.findByName(name);
+    if (name) {
+      const providerExists = await this.providersRepository.findByName(name);
 
-    if (providerExists && providerExists.id !== id) {
-      throw new ConflictException('A provider whith this name already exists');
+      if (providerExists && providerExists.id !== id) {
+        throw new ConflictException(
+          'A provider whith this name already exists',
+        );
+      }
     }
 
     return this.providersRepository.updateProvider(id, updateProviderDto);

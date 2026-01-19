@@ -24,20 +24,20 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Public()
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Criar nova conta de usuário' })
-  @ApiResponse({ status: 201, description: 'Conta criada com sucesso.' })
+  @ApiOperation({ summary: 'Create new user account' })
+  @ApiResponse({ status: 201, description: 'Account successfully created.' })
   @ApiResponse({
     status: 400,
-    description: 'Dados inválidos (senha curta, email inválido, etc).',
+    description: 'Invalid data (short password, invalid email, etc).',
   })
   @ApiResponse({
     status: 409,
-    description: 'Confilto: Email ou Username já estão em uso.',
+    description: 'Conflict: Email or Username already in use.',
   })
   async signup(@Body() signupDto: SignupDto) {
     return this.authService.signup(signupDto);
@@ -46,10 +46,10 @@ export class AuthController {
   @Public()
   @Post('signin')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Fazer login e receber tokens' })
+  @ApiOperation({ summary: 'Login and receive tokens' })
   @ApiResponse({
     status: 200,
-    description: 'Login realizados com sucesso.',
+    description: 'Login successful.',
     schema: {
       example: {
         accessToken: 'eyjhbGci0iJTUz...',
@@ -59,7 +59,7 @@ export class AuthController {
   })
   @ApiResponse({
     status: 401,
-    description: 'Credenciais inválidas (email ou senha errados.',
+    description: 'Invalid credentials (wrong email or password).',
   })
   async signin(@Body() signinDto: SigninDto) {
     return this.authService.signin(signinDto);
@@ -68,10 +68,10 @@ export class AuthController {
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Recuperação de senha' })
+  @ApiOperation({ summary: 'Password recovery' })
   @ApiResponse({
     status: 200,
-    description: 'E-mail de recuperação enviado com sucesso!',
+    description: 'Recovery email sent successfully!',
   })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto.email);
@@ -80,10 +80,10 @@ export class AuthController {
   @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset de senha' })
+  @ApiOperation({ summary: 'Password reset' })
   @ApiResponse({
     status: 200,
-    description: 'Senha alterada com sucesso! agora você pode fazer login.',
+    description: 'Password changed successfully! You can now login.',
   })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(
@@ -95,8 +95,8 @@ export class AuthController {
   @Post('logout')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Fazer Logout' })
-  @ApiResponse({ status: 200, description: 'Logout realizado.' })
+  @ApiOperation({ summary: 'Logout' })
+  @ApiResponse({ status: 200, description: 'Logout successful.' })
   async logout(@User('id') userId: string) {
     return this.authService.logout(userId);
   }
@@ -106,10 +106,10 @@ export class AuthController {
   @ApiBearerAuth()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Atualizar token do usuário' })
+  @ApiOperation({ summary: 'Refresh user token' })
   @ApiResponse({
     status: 200,
-    description: 'Tokens realizados com sucesso.',
+    description: 'Tokens refreshed successfully.',
     schema: {
       example: {
         accessToken: 'eyjhbGci0iJTUz...',
