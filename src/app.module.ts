@@ -6,6 +6,8 @@ import { SlotsModule } from './modules/slots/slots.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { HuntsModule } from './modules/hunts/hunts.module';
+import { HealthModule } from './health/health.module';
+import { CommonModule } from './common/modules/common.module';
 
 @Module({
   imports: [
@@ -15,11 +17,13 @@ import { HuntsModule } from './modules/hunts/hunts.module';
         limit: 100,
       },
     ]),
+    CommonModule,
     CoreModule,
     UsersModule,
     ProvidersModule,
     SlotsModule,
     HuntsModule,
+    HealthModule,
   ],
   providers: [
     {
@@ -28,4 +32,4 @@ import { HuntsModule } from './modules/hunts/hunts.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

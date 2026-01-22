@@ -1,5 +1,5 @@
 import { IsBoolean, IsNotEmpty, IsString, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProviderDto {
   @ApiProperty({
@@ -18,4 +18,13 @@ export class CreateProviderDto {
   @IsBoolean()
   @IsOptional()
   active: boolean;
+
+  @ApiPropertyOptional({
+    description: 'URL of the provider logo/image',
+    example: 'https://example.com/provider-logo.png',
+  })
+  @IsOptional()
+  @IsString()
+  image?: string;
 }
+

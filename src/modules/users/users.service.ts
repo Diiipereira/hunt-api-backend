@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -9,10 +10,16 @@ import * as bcrypt from 'bcrypt';
 import { SignupDto } from './dto/signup.dto';
 import { UpdateUserParams, UsersRepository } from './users.repository';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { unlink } from 'fs/promises';
+import { join } from 'path';
+import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) { }
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(private readonly usersRepository: UsersRepository) {}
 
   private buildSafeUser(user: any, extra?: Record<string, any>) {
     return {
@@ -63,6 +70,10 @@ export class UsersService {
     return this.usersRepository.findByResetToken(token);
   }
 
+  async findUsersWithValidResetToken() {
+    return this.usersRepository.findUsersWithValidResetToken();
+  }
+
   async findByEmailForAuth(email: string) {
     return this.usersRepository.findByEmail(email);
   }
@@ -96,8 +107,29 @@ export class UsersService {
       throw new BadRequestException('You need to upload an image');
     }
 
+    if (file.size > 3 * 1024 * 1024) {
+      await unlink(file.path);
+      throw new BadRequestException(
+        'Image file too large. Maximum size is 3MB.',
+      );
+    }
+
+    const user = await this.usersRepository.findById(userId);
+    if (user && user.avatar) {
+      const oldAvatarPath = join(process.cwd(), 'public', user.avatar);
+      if (existsSync(oldAvatarPath)) {
+        try {
+          await unlink(oldAvatarPath);
+        } catch (error) {
+          this.logger.warn(`Failed to delete old avatar: ${oldAvatarPath}`);
+        }
+      }
+    }
+
     const avatarPath = `/assets/avatars/${file.filename}`;
     const updated = await this.usersRepository.updateAvatar(userId, avatarPath);
+
+    this.logger.log(`Avatar updated for user: ${userId}`);
 
     return this.buildSafeUser(updated, {
       avatar: `${process.env.APP_URL}${avatarPath}`,
@@ -106,12 +138,6 @@ export class UsersService {
 
   async updatePassword(userId: string, updatePasswordDto: UpdatePasswordDto) {
     const { currentPassword, newPassword } = updatePasswordDto;
-
-    if (!currentPassword || !newPassword) {
-      throw new BadRequestException(
-        'Both current and new passwords are required',
-      );
-    }
 
     const user = await this.usersRepository.findByWithPassword(userId);
     if (!user) {
@@ -128,9 +154,25 @@ export class UsersService {
         'New password must be different from the current one',
       );
     }
+
     const newHash = await bcrypt.hash(newPassword, 12);
     await this.usersRepository.updatePassword(userId, newHash);
+    await this.usersRepository.updateRefreshToken(userId, null);
+
+    this.logger.log(`Password updated for user: ${userId}`);
 
     return { message: 'Password updated successfully' };
+  }
+
+  async incrementLoginAttempts(userId: string): Promise<number> {
+    return this.usersRepository.incrementLoginAttempts(userId);
+  }
+
+  async resetLoginAttempts(userId: string) {
+    return this.usersRepository.resetLoginAttempts(userId);
+  }
+
+  async lockAccount(userId: string, lockedUntil: Date) {
+    return this.usersRepository.lockAccount(userId, lockedUntil);
   }
 }

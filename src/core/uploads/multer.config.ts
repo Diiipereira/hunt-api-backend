@@ -17,12 +17,13 @@ export const multerConfig = {
     filename: (req: Request & { user?: { id?: string } }, file, callback) => {
       const userId = req.user?.id || 'anonymous';
       const fileExt = extname(file.originalname);
-      const fileName = `avatar_${userId}${fileExt}`;
+      const timestamp = Date.now();
+      const fileName = `avatar_${userId}_${timestamp}${fileExt}`;
       callback(null, fileName);
     },
   }),
 
-  fileFilter: (req, file, callback) => {
+  fileFilter: (req: any, file: any, callback: any) => {
     const allowed = ['.jpg', '.jpeg', '.png'];
     const ext = extname(file.originalname).toLowerCase();
 

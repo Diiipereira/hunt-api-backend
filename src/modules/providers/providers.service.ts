@@ -21,7 +21,7 @@ export class ProvidersService {
     }
 
     const dataToSave = {
-      name: createProviderDto.name,
+      ...createProviderDto,
       active: true,
     };
 
@@ -81,6 +81,8 @@ export class ProvidersService {
       throw new NotFoundException('Provider not found');
     }
 
-    return this.providersRepository.updateStatusProvider(id, { active: true });
+    return this.providersRepository.updateStatusProvider(id, {
+      active: !statusToUpdate.active,
+    });
   }
 }

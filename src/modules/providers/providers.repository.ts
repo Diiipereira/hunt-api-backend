@@ -5,6 +5,7 @@ export type SafeProvider = {
   id: string;
   name: string;
   active: boolean;
+  image: string | null;
   createdAt: Date;
   _count?: {
     slots: number;
@@ -18,6 +19,7 @@ export class ProvidersRepository {
   async createProvider(data: {
     name: string;
     active: boolean;
+    image?: string;
   }): Promise<SafeProvider> {
     return this.prisma.provider.create({
       data,
@@ -25,6 +27,7 @@ export class ProvidersRepository {
         id: true,
         name: true,
         active: true,
+        image: true,
         createdAt: true,
       },
     });
@@ -44,6 +47,7 @@ export class ProvidersRepository {
         id: true,
         name: true,
         active: true,
+        image: true,
         createdAt: true,
         _count: {
           select: {
@@ -64,6 +68,7 @@ export class ProvidersRepository {
         id: true,
         name: true,
         active: true,
+        image: true,
         createdAt: true,
       },
     });
@@ -71,7 +76,7 @@ export class ProvidersRepository {
 
   async updateProvider(
     id: string,
-    data: { name?: string },
+    data: { name?: string; image?: string },
   ): Promise<SafeProvider> {
     return this.prisma.provider.update({
       where: { id },
@@ -80,6 +85,7 @@ export class ProvidersRepository {
         id: true,
         name: true,
         active: true,
+        image: true,
         createdAt: true,
       },
     });
@@ -96,6 +102,7 @@ export class ProvidersRepository {
         id: true,
         name: true,
         active: true,
+        image: true,
         createdAt: true,
       },
     });

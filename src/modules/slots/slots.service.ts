@@ -8,13 +8,15 @@ import { SlotsRepository } from './slots.repository';
 import { CreateSlotDto } from './dto/create-slot.dto';
 import { UpdateSlotDto } from './dto/update-slot.dto';
 import { ProvidersRepository } from '../providers/providers.repository';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { PaginatedResponse } from 'src/common/interfaces/paginated-response.interface';
 
 @Injectable()
 export class SlotsService {
   constructor(
     private readonly slotsRepository: SlotsRepository,
     private readonly providersRepository: ProvidersRepository,
-  ) { }
+  ) {}
 
   async createSlot(createSlotDto: CreateSlotDto) {
     const slotExists = await this.slotsRepository.findByName(
@@ -43,13 +45,40 @@ export class SlotsService {
     });
   }
 
-  async findAllSlots(active: string) {
+  async findAllSlots(
+    active: string,
+    pagination?: PaginationDto,
+  ): Promise<PaginatedResponse<any> | any[]> {
     const where: { active?: boolean } = {};
 
     if (active === 'false') {
       where.active = false;
     } else if (active === 'true') {
       where.active = true;
+    }
+
+    if (pagination && pagination.page && pagination.limit) {
+      const { page, limit } = pagination;
+      const skip = (page - 1) * limit;
+
+      const [data, total] = await Promise.all([
+        this.slotsRepository.findAllSlots(where, { skip, take: limit }),
+        this.slotsRepository.count(where),
+      ]);
+
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+        },
+      };
     }
 
     return this.slotsRepository.findAllSlots(where);
@@ -109,6 +138,7 @@ export class SlotsService {
 
     return { message: 'All slots for this provider have been activated' };
   }
+
   async toggleFavorite(userId: string, slotId: string) {
     const slot = await this.slotsRepository.findById(slotId);
     if (!slot) {

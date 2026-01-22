@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,8 @@ import { SigninDto } from 'src/core/auth/dto/signin.dto';
 import { SignupDto } from 'src/modules/users/dto/signup.dto';
 import { UsersService } from 'src/modules/users/users.service';
 import { MailService } from 'src/mail/mail.service';
+import { AuditService } from 'src/common/services/audit.service';
+import { AuditAction } from 'generated/prisma/client';
 
 type Tokens = {
   accessToken: string;
@@ -21,50 +24,113 @@ type Tokens = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+  private readonly MAX_LOGIN_ATTEMPTS = 5;
+  private readonly LOCK_TIME = 15 * 60 * 1000;
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-  ) { }
+    private readonly auditService: AuditService,
+  ) {}
 
-  async signup(signupDto: SignupDto): Promise<Tokens> {
+  async signup(
+    signupDto: SignupDto,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<Tokens> {
     const user = await this.usersService.signup(signupDto);
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRtHash(user.id, tokens.refreshToken);
+    await this.auditService.log(AuditAction.SIGNUP, user.id, ip, userAgent);
+    this.logger.log(`New user registered: ${user.email}`);
     return tokens;
   }
 
-  async signin(signinDto: SigninDto): Promise<Tokens> {
+  async signin(
+    signinDto: SigninDto,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<Tokens> {
+    const startTime = Date.now();
     const user = await this.usersService.findByEmailForAuth(signinDto.email);
 
-    if (!user) throw new UnauthorizedException('Invalid Credentials');
+    if (!user) {
+      await this.constantTimeDelay(startTime);
+      throw new UnauthorizedException('Invalid Credentials');
+    }
+
+    if (user.lockedUntil && new Date() < user.lockedUntil) {
+      const remainingTime = Math.ceil(
+        (user.lockedUntil.getTime() - Date.now()) / 1000 / 60,
+      );
+      throw new UnauthorizedException(
+        `Account locked. Try again in ${remainingTime} minutes`,
+      );
+    }
 
     const isPasswordValid = await bcrypt.compare(
       signinDto.password,
       user.passwordHash,
     );
 
-    if (!isPasswordValid)
+    if (!isPasswordValid) {
+      await this.handleFailedLogin(user.id, signinDto.email, ip, userAgent);
+      await this.constantTimeDelay(startTime);
       throw new UnauthorizedException('Invalid Credentials');
+    }
 
+    await this.usersService.resetLoginAttempts(user.id);
     await this.usersService.updateLastLogin(user.id);
+    await this.auditService.log(AuditAction.LOGIN, user.id, ip, userAgent);
 
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRtHash(user.id, tokens.refreshToken);
 
+    this.logger.log(`User logged in: ${user.email}`);
     return tokens;
   }
 
+  private async handleFailedLogin(
+    userId: string,
+    email: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const attempts = await this.usersService.incrementLoginAttempts(userId);
+
+    if (attempts >= this.MAX_LOGIN_ATTEMPTS) {
+      const lockedUntil = new Date(Date.now() + this.LOCK_TIME);
+      await this.usersService.lockAccount(userId, lockedUntil);
+      await this.auditService.log(
+        AuditAction.ACCOUNT_LOCKED,
+        userId,
+        ip,
+        userAgent,
+        { reason: 'Max login attempts exceeded' },
+      );
+      this.logger.warn(`Account locked for user: ${email}`);
+    } else {
+      this.logger.warn(
+        `Failed login attempt ${attempts}/${this.MAX_LOGIN_ATTEMPTS} for email: ${email}`,
+      );
+    }
+  }
+
   async forgotPassword(email: string) {
+    const startTime = Date.now();
+
     const user = await this.usersService.findByEmail(email);
 
     if (user) {
-      const resetToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 600000);
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = await bcrypt.hash(resetToken, 10);
+      const expiresAt = new Date(Date.now() + 3600000);
 
       await this.usersService.update(user.id, {
-        resetToken: resetToken,
+        resetToken: hashedToken,
         resetTokenExpires: expiresAt,
       });
 
@@ -73,17 +139,23 @@ export class AuthService {
         resetToken,
         user.userName,
       );
+
+      this.logger.log(`Password reset requested for: ${email}`);
     }
+
+    await this.constantTimeDelay(startTime, 200);
 
     return {
       message:
-        'If you email address is registered, you will receive a recovery link shortly',
+        'If your email address is registered, you will receive a recovery link shortly',
     };
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, ip?: string, userAgent?: string) {
     if (userId) {
       await this.usersService.updateRefreshToken(userId, null);
+      await this.auditService.log(AuditAction.LOGOUT, userId, ip, userAgent);
+      this.logger.log(`User logged out: ${userId}`);
     }
     return { message: 'Logout Successful' };
   }
@@ -103,28 +175,51 @@ export class AuthService {
     return tokens;
   }
 
-  async resetPassword(token: string, newPassword: string) {
-    const user = await this.usersService.findByResetToken(token);
+  async resetPassword(
+    token: string,
+    newPassword: string,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const users = await this.usersService.findUsersWithValidResetToken();
 
-    if (!user) {
-      throw new NotFoundException('Invalid Token');
+    let matchedUser: {
+      id: string;
+      email: string;
+      resetToken: string | null;
+      resetTokenExpires: Date | null;
+    } | null = null;
+
+    for (const u of users) {
+      if (u.resetToken && (await bcrypt.compare(token, u.resetToken))) {
+        matchedUser = u;
+        break;
+      }
     }
 
-    if (user.resetTokenExpires && new Date() > user.resetTokenExpires) {
-      throw new BadRequestException(
-        'The token has expired. Please request a new one',
-      );
+    if (!matchedUser) {
+      throw new NotFoundException('Invalid or expired token');
     }
 
     const hash = await bcrypt.hash(newPassword, 12);
 
-    await this.usersService.update(user.id, {
+    await this.usersService.update(matchedUser.id, {
       passwordHash: hash,
       resetToken: null,
       resetTokenExpires: null,
+      refreshTokenHash: null,
     });
 
-    return { message: 'Password changed successssfully! You can now log in.' };
+    await this.auditService.log(
+      AuditAction.PASSWORD_RESET,
+      matchedUser.id,
+      ip,
+      userAgent,
+    );
+
+    this.logger.log(`Password reset successful for user: ${matchedUser.id}`);
+
+    return { message: 'Password changed successfully! You can now log in.' };
   }
 
   private async updateRtHash(userId: string, rt: string) {
@@ -132,7 +227,11 @@ export class AuthService {
     await this.usersService.updateRefreshToken(userId, hash);
   }
 
-  private async getTokens(userId: string, email: string, role: string): Promise<Tokens> {
+  private async getTokens(
+    userId: string,
+    email: string,
+    role: string,
+  ): Promise<Tokens> {
     interface JwtPayload {
       sub: string;
       email: string;
@@ -142,7 +241,8 @@ export class AuthService {
     const payload: JwtPayload = { sub: userId, email, role };
 
     const secret = this.configService.getOrThrow<string>('JWT_ACCESS_SECRET');
-    const refreshSecret = this.configService.getOrThrow<string>('JWT_REFRESH_SECRET');
+    const refreshSecret =
+      this.configService.getOrThrow<string>('JWT_REFRESH_SECRET');
 
     const atExpiration = this.configService.getOrThrow<string>(
       'JWT_ACCESS_EXPIRATION',
@@ -166,5 +266,12 @@ export class AuthService {
       accessToken: at,
       refreshToken: rt,
     };
+  }
+
+  private async constantTimeDelay(startTime: number, minDelay: number = 200) {
+    const elapsed = Date.now() - startTime;
+    if (elapsed < minDelay) {
+      await new Promise((resolve) => setTimeout(resolve, minDelay - elapsed));
+    }
   }
 }

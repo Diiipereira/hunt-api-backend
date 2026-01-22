@@ -4,12 +4,14 @@ import {
   IsInt,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
+  IsUrl,
   IsUUID,
 } from 'class-validator';
 import { SlotVolatility } from '../enums/slot-volatility.enum';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSlotDto {
   @ApiProperty({
@@ -56,4 +58,13 @@ export class CreateSlotDto {
   @IsNotEmpty()
   @IsPositive()
   maxMultiplier: number;
+
+  @ApiPropertyOptional({
+    description: 'URL of the slot image',
+    example: 'https://example.com/slot-image.png',
+  })
+  @IsOptional()
+  @IsString()
+  image?: string;
 }
+

@@ -20,12 +20,16 @@ import {
 } from '@nestjs/swagger';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { Throttle } from '@nestjs/throttler';
+import { IpAddress } from 'src/common/decorators/ip.decorator';
+import { UserAgent } from 'src/common/decorators/user-agent.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Public()
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
@@ -39,10 +43,15 @@ export class AuthController {
     status: 409,
     description: 'Conflict: Email or Username already in use.',
   })
-  async signup(@Body() signupDto: SignupDto) {
-    return this.authService.signup(signupDto);
+  async signup(
+    @Body() signupDto: SignupDto,
+    @IpAddress() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
+    return this.authService.signup(signupDto, ip, userAgent);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Public()
   @Post('signin')
   @HttpCode(HttpStatus.OK)
@@ -61,10 +70,15 @@ export class AuthController {
     status: 401,
     description: 'Invalid credentials (wrong email or password).',
   })
-  async signin(@Body() signinDto: SigninDto) {
-    return this.authService.signin(signinDto);
+  async signin(
+    @Body() signinDto: SigninDto,
+    @IpAddress() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
+    return this.authService.signin(signinDto, ip, userAgent);
   }
 
+  @Throttle({ default: { limit: 3, ttl: 300000 } })
   @Public()
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
@@ -77,6 +91,7 @@ export class AuthController {
     return this.authService.forgotPassword(forgotPasswordDto.email);
   }
 
+  @Throttle({ default: { limit: 3, ttl: 300000 } })
   @Public()
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
@@ -85,10 +100,16 @@ export class AuthController {
     status: 200,
     description: 'Password changed successfully! You can now login.',
   })
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+  async resetPassword(
+    @Body() resetPasswordDto: ResetPasswordDto,
+    @IpAddress() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
     return this.authService.resetPassword(
       resetPasswordDto.token,
       resetPasswordDto.password,
+      ip,
+      userAgent,
     );
   }
 
@@ -97,8 +118,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout' })
   @ApiResponse({ status: 200, description: 'Logout successful.' })
-  async logout(@User('id') userId: string) {
-    return this.authService.logout(userId);
+  async logout(
+    @User('id') userId: string,
+    @IpAddress() ip: string,
+    @UserAgent() userAgent: string,
+  ) {
+    return this.authService.logout(userId, ip, userAgent);
   }
 
   @Public()

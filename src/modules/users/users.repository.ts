@@ -9,6 +9,8 @@ export interface UpdateUserParams {
   avatar?: string;
   lastLogin?: Date;
   refreshTokenHash?: string | null;
+  loginAttempts?: number;
+  lockedUntil?: Date | null;
 }
 
 export type SafeUser = {
@@ -37,6 +39,8 @@ export class UsersRepository {
         createdAt: true,
         lastLogin: true,
         role: true,
+        loginAttempts: true,
+        lockedUntil: true,
       },
     });
   }
@@ -162,8 +166,52 @@ export class UsersRepository {
       select: {
         id: true,
         email: true,
+        resetToken: true,
         resetTokenExpires: true,
       },
+    });
+  }
+
+  async findUsersWithValidResetToken() {
+    return this.prisma.user.findMany({
+      where: {
+        resetToken: { not: null },
+        resetTokenExpires: { gte: new Date() },
+      },
+      select: {
+        id: true,
+        email: true,
+        resetToken: true,
+        resetTokenExpires: true,
+      },
+    });
+  }
+
+  async incrementLoginAttempts(userId: string): Promise<number> {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        loginAttempts: { increment: 1 },
+      },
+      select: { loginAttempts: true },
+    });
+    return user.loginAttempts;
+  }
+
+  async resetLoginAttempts(userId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        loginAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+  }
+
+  async lockAccount(userId: string, lockedUntil: Date) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { lockedUntil },
     });
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -6,10 +6,11 @@ import { Resend } from 'resend';
 
 @Injectable()
 export class MailService {
+  private readonly logger = new Logger(MailService.name);
   private resend: Resend;
 
   constructor(private readonly configService: ConfigService) {
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    this.resend = new Resend(this.configService.get('RESEND_API_KEY'));
   }
 
   async sendPasswordResetEmail(email: string, token: string, name: string) {
@@ -33,8 +34,9 @@ export class MailService {
         subject: 'Redefinição de senha - Bonus Hunt',
         html: htmlContent,
       });
+      this.logger.log(`Password reset email sent to ${email}`);
     } catch (error) {
-      console.error('Erro ao enviar email:', error);
+      this.logger.error(`Failed to send email to ${email}`, error.stack);
       throw error;
     }
   }

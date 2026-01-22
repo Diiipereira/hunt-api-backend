@@ -9,6 +9,7 @@ import {
   Body,
   ParseUUIDPipe,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { CreateProviderDto } from './dto/create-provider.dto';
 import { ProvidersService } from './providers.service';
@@ -24,17 +25,23 @@ import {
   ApiQuery,
   ApiParam,
 } from '@nestjs/swagger';
+import { CacheInterceptor } from 'src/common/interceptors/cache.interceptor';
 
 @ApiTags('Providers')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
 @Controller('providers')
 export class ProvidersController {
-  constructor(private readonly providersService: ProvidersService) { }
+  constructor(private readonly providersService: ProvidersService) {}
 
   @Get()
+  @UseInterceptors(CacheInterceptor)
   @ApiOperation({ summary: 'List all providers' })
-  @ApiQuery({ name: 'active', required: false, description: 'Filter by active status' })
+  @ApiQuery({
+    name: 'active',
+    required: false,
+    description: 'Filter by active status',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of providers retrieved successfully.',

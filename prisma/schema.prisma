@@ -29,6 +29,18 @@ enum UserRole {
   ADMIN
 }
 
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  SIGNUP
+  PASSWORD_CHANGE
+  PASSWORD_RESET
+  AVATAR_UPDATE
+  ACCOUNT_LOCKED
+  ACCOUNT_UNLOCKED
+  ROLE_CHANGE
+}
+
 model User {
   id                String    @id @default(uuid())
   userName          String    @unique @map("user_name")
@@ -40,12 +52,18 @@ model User {
   resetToken        String?   @map("reset_token")
   resetTokenExpires DateTime? @map("reset_token_expires")
   lastLogin         DateTime? @map("last_login")
+  loginAttempts     Int       @default(0) @map("login_attempts")
+  lockedUntil       DateTime? @map("locked_until")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
   hunts         Hunt[]
   favoriteSlots UserFavoriteSlot[]
+  auditLogs     AuditLog[]
 
+  @@index([email])
+  @@index([userName])
+  @@index([resetToken])
   @@map("users")
 }
 
@@ -63,6 +81,7 @@ model Provider {
   id        String   @id @default(uuid())
   name      String
   active    Boolean
+  image     String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -79,6 +98,7 @@ model Slot {
   rtp           Decimal?       @db.Decimal(5, 2)
   volatility    SlotVolatility
   maxMultiplier Int            @map("max_multiplier")
+  image         String?
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
@@ -86,6 +106,8 @@ model Slot {
   huntSlots     HuntSlot[]
   favoriteSlots UserFavoriteSlot[]
 
+  @@index([providerId])
+  @@index([active])
   @@map("slots")
 }
 
@@ -107,6 +129,8 @@ model Hunt {
   Currency  Currency   @relation(fields: [currencyCode], references: [code])
   huntSlots HuntSlot[]
 
+  @@index([userId])
+  @@index([status])
   @@map("hunts")
 }
 
@@ -123,6 +147,8 @@ model HuntSlot {
   slots Slot @relation(fields: [slotId], references: [id])
   hunts Hunt @relation(fields: [huntId], references: [id])
 
+  @@index([huntId])
+  @@index([slotId])
   @@map("hunt_slots")
 }
 
@@ -136,4 +162,21 @@ model UserFavoriteSlot {
 
   @@id([userId, slotId])
   @@map("user_favorite_slots")
+}
+
+model AuditLog {
+  id        String      @id @default(uuid())
+  userId    String?     @map("user_id")
+  action    AuditAction
+  ip        String?
+  userAgent String?     @map("user_agent")
+  metadata  String?     @db.Text
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

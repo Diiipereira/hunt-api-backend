@@ -10,6 +10,7 @@ export type SafeSlot = {
   rtp: string | null;
   volatility: SlotVolatility;
   maxMultiplier: number;
+  image: string | null;
 };
 
 @Injectable()
@@ -23,6 +24,7 @@ export class SlotsRepository {
     rtp: string;
     volatility: SlotVolatility;
     maxMultiplier: number;
+    image?: string;
   }): Promise<SafeSlot> {
     const created = await this.prisma.slot.create({
       data,
@@ -34,6 +36,7 @@ export class SlotsRepository {
         rtp: true,
         volatility: true,
         maxMultiplier: true,
+        image: true,
       },
     });
 
@@ -58,10 +61,13 @@ export class SlotsRepository {
     });
   }
 
-  async findAllSlots(where: {
-    active?: boolean;
-    providerId?: string;
-  }): Promise<SafeSlot[]> {
+  async findAllSlots(
+    where: {
+      active?: boolean;
+      providerId?: string;
+    },
+    options?: { skip?: number; take?: number },
+  ): Promise<SafeSlot[]> {
     const slots = await this.prisma.slot.findMany({
       where: where,
       select: {
@@ -72,6 +78,7 @@ export class SlotsRepository {
         rtp: true,
         volatility: true,
         maxMultiplier: true,
+        image: true,
         providers: {
           select: {
             name: true,
@@ -81,11 +88,16 @@ export class SlotsRepository {
       orderBy: {
         createdAt: 'desc',
       },
+      ...options,
     });
     return slots.map((slot) => ({
       ...slot,
       rtp: slot.rtp ? slot.rtp.toString() : null,
     }));
+  }
+
+  async count(where: { active?: boolean; providerId?: string }) {
+    return this.prisma.slot.count({ where });
   }
 
   async updateSlot(
@@ -95,6 +107,7 @@ export class SlotsRepository {
       rtp?: string;
       slotVolatility?: SlotVolatility;
       maxMultiplier?: number;
+      image?: string;
     },
   ): Promise<SafeSlot> {
     const updated = await this.prisma.slot.update({
@@ -108,6 +121,7 @@ export class SlotsRepository {
         rtp: true,
         volatility: true,
         maxMultiplier: true,
+        image: true,
       },
     });
 
@@ -132,6 +146,7 @@ export class SlotsRepository {
         rtp: true,
         volatility: true,
         maxMultiplier: true,
+        image: true,
       },
     });
 

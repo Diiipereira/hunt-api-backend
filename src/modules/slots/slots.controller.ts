@@ -25,23 +25,43 @@ import {
   ApiQuery,
   ApiParam,
 } from '@nestjs/swagger';
+import { PaginationDto } from 'src/common/dto/pagination.dto';
 
 @ApiTags('Slots')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
 @Controller('slots')
 export class SlotsController {
-  constructor(private readonly slotsService: SlotsService) { }
+  constructor(private readonly slotsService: SlotsService) {}
 
   @Get()
   @ApiOperation({ summary: 'List all slots' })
-  @ApiQuery({ name: 'active', required: false, description: 'Filter by active status' })
+  @ApiQuery({
+    name: 'active',
+    required: false,
+    description: 'Filter by active status',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page',
+    type: Number,
+  })
   @ApiResponse({
     status: 200,
     description: 'List of slots retrieved successfully.',
   })
-  async findAllSlots(@Query('active') active: string) {
-    return this.slotsService.findAllSlots(active);
+  async findAllSlots(
+    @Query('active') active: string,
+    @Query() pagination: PaginationDto,
+  ) {
+    return this.slotsService.findAllSlots(active, pagination);
   }
 
   @Post('create')
@@ -114,6 +134,7 @@ export class SlotsController {
   async softDeleteSlot(@Param('id', ParseUUIDPipe) id: string) {
     return this.slotsService.softDeleteSlot(id);
   }
+
   @Get('favorites')
   @ApiOperation({ summary: 'List user favorite slots' })
   @ApiResponse({
